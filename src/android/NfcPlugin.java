@@ -56,13 +56,18 @@ public class NfcPlugin extends CordovaPlugin {
 
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
-        if(action.equals("status")) {
-            status(callbackContext);
-            return true;
-        }
+        
+        
 
         if(action.equals("askForPermission")) {
             askForPermission(callbackContext);
+            return true;
+        }
+
+        String nfcStatus = getNfcStatus();
+
+        if(action.equals("status")) {
+            status(nfcStatus, callbackContext);
             return true;
         }
 
@@ -81,7 +86,11 @@ public class NfcPlugin extends CordovaPlugin {
             return true;
         }
 
-        String nfcStatus = getNfcStatus();
+        if(action.equals("setMimeTypeFilter")) {
+            setMimeTypeFilter(args, nfcStatus, callbackContext);
+            return true;
+        }
+
         if (!nfcStatus.equals(STATUS_NFC_OK)) {
             callbackContext.error(nfcStatus);
             return true; // NFC is not present or is disabled
@@ -90,9 +99,6 @@ public class NfcPlugin extends CordovaPlugin {
         if(action.equals("write")) {
             write(args, callbackContext);
         }
-        else if(action.equals("setMimeTypeFilter")) {
-            setMimeTypeFilter(args, callbackContext);
-        }
         else {
           return false;
         }
@@ -100,8 +106,8 @@ public class NfcPlugin extends CordovaPlugin {
         return true;
     }
 
-    private void status(CallbackContext callbackContext) {
-        callbackContext.success(getNfcStatus());
+    private void status(String nfcStatus, CallbackContext callbackContext) {
+        callbackContext.success(nfcStatus);
     }
 
     private void askForPermission(CallbackContext callbackContext) {
@@ -173,13 +179,16 @@ public class NfcPlugin extends CordovaPlugin {
         this.stateChangeCallbackContext = callbackContext;
     }
 
-    private void setMimeTypeFilter(JSONArray args, CallbackContext callbackContext) {
+    private void setMimeTypeFilter(JSONArray args, String nfcStatus, CallbackContext callbackContext) {
         try {
             mimeTypeFilter.clear();
             for (int i = 0; i < args.length(); i++) {
                 mimeTypeFilter.add(args.getString(i));
             }
-            restartNfc();
+            
+            if(nfcStatus.equals(STATUS_NFC_OK))
+              restartNfc();
+
             callbackContext.success();
         } catch (JSONException e) {
             callbackContext.error("Failed to set MIME type filter");
