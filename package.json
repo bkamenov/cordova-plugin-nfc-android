@@ -1,0 +1,34 @@
+{
+  "name": "cordova-plugin-nfc-android",
+  "version": "1.0.0",
+  "description": "Cordova NFC Plugin for Android",
+  "license": "MIT",
+  "keywords": [
+    "ecosystem:cordova",
+    "cordova-android",
+    "cordova",
+    "nfc"
+  ],
+  "engines": {
+    "cordovaDependencies": {
+      "cordova-android": ">=12.0.0"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bkamenov/cordova-plugin-nfc-android.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bkamenov/cordova-plugin-nfc-android/issues"
+  },
+  "author": "Boris Kamenov",
+  "cordova": {
+    "id": "cordova-plugin-nfc-android",
+    "platforms": [
+      "android"
+    ]
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
