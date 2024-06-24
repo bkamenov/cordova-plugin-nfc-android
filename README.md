@@ -68,7 +68,7 @@ document.addEventListener('ndef',
     // because you are not obligated to write to tags.)
     const message = {
       mimeType: "text/plain", // mimeType is optional
-      ndefData: Array.from(new TextEncoder().encode("My message"))
+      ndefData: new TextEncoder().encode("My message").buffer
     };
     // The write command should be run in the context of read. 
     // Otherwise, the behavior is unknown.

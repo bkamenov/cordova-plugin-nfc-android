@@ -11,24 +11,25 @@ var NFC = {
     exec(success, error, 'NfcPlugin', 'showSettings', []);
   },
   write: function (message, success, error) {
-    exec(success, error, 'NfcPlugin', 'write', [message]);
+    var transformedMessage = { ...message };
+    transformedMessage.ndefData = Array.from(new Uint8Array(message.ndefData));
+    exec(success, error, 'NfcPlugin', 'write', [transformedMessage]);
   },
   setMimeTypeFilter: function (mimeTypes, success, error) {
     exec(success, error, 'NfcPlugin', 'setMimeTypeFilter', [mimeTypes]);
   }
 };
 
-require('cordova/channel').onCordovaReady.subscribe(() => {
-
-  function intArrayToArrayBuffer(intArray) {
-    var buffer = new ArrayBuffer(intArray.length);
-    var view = new Uint8Array(buffer);
-    for (var i = 0; i < intArray.length; i++) {
-      view[i] = intArray[i];
-    }
-    return buffer;
+function intArrayToArrayBuffer(intArray) {
+  var buffer = new ArrayBuffer(intArray.length);
+  var view = new Uint8Array(buffer);
+  for (var i = 0; i < intArray.length; i++) {
+    view[i] = intArray[i];
   }
+  return buffer;
+}
 
+require('cordova/channel').onCordovaReady.subscribe(() => {
   exec((event) => {
     var transformedEvent = { ...event };
     transformedEvent.ndefData = intArrayToArrayBuffer(event.ndefData);
@@ -42,5 +43,12 @@ require('cordova/channel').onCordovaReady.subscribe(() => {
   }, null, 'NfcPlugin', 'setStateChangeListener', []);
 
 });
+
+//Wait for onther stuff to be loaded and then fire the launhing ndef intent (if any)
+document.addEventListener("deviceready", () => {
+  setTimeout(() => {
+    exec(null, null, 'NfcPlugin', 'handleLaunchNfcIntent', []);
+  }, 0);
+}, false);
 
 module.exports = NFC;

@@ -57,8 +57,6 @@ public class NfcPlugin extends CordovaPlugin {
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
         
-        
-
         if(action.equals("askForPermission")) {
             askForPermission(callbackContext);
             return true;
@@ -73,6 +71,11 @@ public class NfcPlugin extends CordovaPlugin {
 
         if(action.equals("showSettings")) {
             showSettings(callbackContext);
+            return true;
+        }
+
+        if(action.equals("handleLaunchNfcIntent")) {
+            handleLaunchNfcIntent(callbackContext);
             return true;
         }
 
@@ -136,6 +139,12 @@ public class NfcPlugin extends CordovaPlugin {
         callbackContext.success();
     }
 
+    private void handleLaunchNfcIntent(CallbackContext callbackContext) {
+      Intent intent = getIntent();
+      handleNfcIntent(intent);
+      callbackContext.success();
+    }
+
     private void write(JSONArray args, CallbackContext callbackContext) {
         try {
             if (currentTag == null) {
@@ -197,6 +206,10 @@ public class NfcPlugin extends CordovaPlugin {
 
     private Activity getActivity() {
       return cordova.getActivity();
+    }
+
+    private Intent getIntent() {
+        return getActivity().getIntent();
     }
 
     private void createPendingIntent() {
@@ -333,6 +346,9 @@ public class NfcPlugin extends CordovaPlugin {
         } else {
             currentTag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
         }
+
+        if(currentTag == null)
+          return;
 
         Ndef ndef = Ndef.get(currentTag);
 
