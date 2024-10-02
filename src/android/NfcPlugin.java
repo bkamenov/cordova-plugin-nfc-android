@@ -280,7 +280,7 @@ public class NfcPlugin extends CordovaPlugin {
                 } catch (Exception ex) {
                     // Handle other potential exceptions
                     ex.printStackTrace();
-                    debug = "startNfc: non filter exception: " + e.toString();
+                    debug = "startNfc: non filter exception: " + ex.toString();
                 }
             }
         });
