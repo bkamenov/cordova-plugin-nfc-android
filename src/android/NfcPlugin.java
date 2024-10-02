@@ -46,6 +46,8 @@ public class NfcPlugin extends CordovaPlugin {
     private BroadcastReceiver nfcStateReceiver;
     private boolean lastNfcEnabledState;
 
+    private String debug = "";
+
     @Override
     protected void pluginInitialize() {
         lastNfcEnabledState = getNfcStatus().equals(STATUS_NFC_OK);
@@ -250,32 +252,70 @@ public class NfcPlugin extends CordovaPlugin {
         getActivity().runOnUiThread(() -> {
             NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(getActivity());
             if (nfcAdapter != null) {
-                IntentFilter[] filters = new IntentFilter[mimeTypeFilter.size() + 1];
-                int i = 0;
-                for (String mimeType : mimeTypeFilter) {
-                    IntentFilter filter = new IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED);
-                    try {
-                        filter.addDataType(mimeType);
-                    } catch (IntentFilter.MalformedMimeTypeException e) {
-                        e.printStackTrace();
-                    }
-                    filters[i++] = filter;
-                }
-                // Always add a tech filter to handle TECH_DISCOVERED actions
-                filters[i] = new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED);
-
-                intentFiltersArray = filters;
-                techListsArray = new String[][]{new String[]{Ndef.class.getName()}, new String[]{NdefFormatable.class.getName()}};
-
                 try {
+                    // Create IntentFilters array based on the MIME type filter
+                    IntentFilter[] filters = new IntentFilter[mimeTypeFilter.size() + 1];
+                    int i = 0;
+                    for (String mimeType : mimeTypeFilter) {
+                        IntentFilter filter = new IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED);
+                        filter.addDataType(mimeType); // Add MIME type to filter
+                        filters[i++] = filter;
+                    }
+
+                    // Add a tech filter for tech discovery (always included)
+                    filters[i] = new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED);
+
+                    // Update the global intentFiltersArray and techListsArray
+                    intentFiltersArray = filters;
+                    techListsArray = new String[][] { new String[] { Ndef.class.getName() }, new String[] { NdefFormatable.class.getName() } };
+
+                    // Enable foreground dispatch with the updated filters
                     nfcAdapter.enableForegroundDispatch(getActivity(), getPendingIntent(), intentFiltersArray, techListsArray);
-                }
-                catch(Exception ex) {
-                    //App is possibly terminating
+
+                    debug = "startNfc: All set correctly.";
+
+                } catch (IntentFilter.MalformedMimeTypeException e) {
+                    e.printStackTrace(); // Log or handle this error
+                    debug = "startNfc: Filters not applied successfully: " + e.toString();
+                } catch (Exception ex) {
+                    // Handle other potential exceptions
+                    ex.printStackTrace();
+                    debug = "startNfc: non filter exception: " + e.toString();
                 }
             }
         });
     }
+
+    // private void startNfc() {
+    //     getActivity().runOnUiThread(() -> {
+    //         NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(getActivity());
+    //         if (nfcAdapter != null) {
+    //             IntentFilter[] filters = new IntentFilter[mimeTypeFilter.size() + 1];
+    //             int i = 0;
+    //             for (String mimeType : mimeTypeFilter) {
+    //                 IntentFilter filter = new IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED);
+    //                 try {
+    //                     filter.addDataType(mimeType);
+    //                 } catch (IntentFilter.MalformedMimeTypeException e) {
+    //                     e.printStackTrace();
+    //                 }
+    //                 filters[i++] = filter;
+    //             }
+    //             // Always add a tech filter to handle TECH_DISCOVERED actions
+    //             filters[i] = new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED);
+
+    //             intentFiltersArray = filters;
+    //             techListsArray = new String[][]{new String[]{Ndef.class.getName()}, new String[]{NdefFormatable.class.getName()}};
+
+    //             try {
+    //                 nfcAdapter.enableForegroundDispatch(getActivity(), getPendingIntent(), intentFiltersArray, techListsArray);
+    //             }
+    //             catch(Exception ex) {
+    //                 //App is possibly terminating
+    //             }
+    //         }
+    //     });
+    // }
 
     private void stopNfc() {
         getActivity().runOnUiThread(() -> {
@@ -364,6 +404,8 @@ public class NfcPlugin extends CordovaPlugin {
                     if (mimeType != null && mimeType.length() > 0) {
                       event.put("mimeType", mimeType);
                     }
+
+                    event.put("debug", debug);
 
                     event.put("ndefData", payloadToArray(record.getPayload()));
                     PluginResult result = new PluginResult(PluginResult.Status.OK, event);
