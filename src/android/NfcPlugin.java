@@ -104,6 +104,10 @@ public class NfcPlugin extends CordovaPlugin {
         if(action.equals("write")) {
             write(args, callbackContext);
         }
+        else if(action.equals("beginNfc")) {
+            beginNfc(callbackContext);
+            return true;
+        }
         else {
           return false;
         }
@@ -190,15 +194,22 @@ public class NfcPlugin extends CordovaPlugin {
         this.stateChangeCallbackContext = callbackContext;
     }
 
+    private void beginNfc(CallbackContext callbackContext) {
+      try {
+          startNfc();
+          callbackContext.success();
+      } catch (Exception e) {
+          callbackContext.error("Failed to begin listening for NFC intents. Error: " + e.toString());
+      }
+    }
+
     private void setMimeTypeFilter(JSONArray args, String nfcStatus, CallbackContext callbackContext) {
         try {
             mimeTypeFilter.clear();
-            for (int i = 0; i < args.length(); i++) {
-                mimeTypeFilter.add(args.getString(i));
+            JSONArray filterArray = args.getJSONArray(0);
+            for (int i = 0; i < filterArray.length(); i++) {
+                mimeTypeFilter.add(filterArray.getString(i));
             }
-            
-            if(nfcStatus.equals(STATUS_NFC_OK))
-              restartNfc();
 
             callbackContext.success();
         } catch (JSONException e) {
@@ -253,34 +264,19 @@ public class NfcPlugin extends CordovaPlugin {
             NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(getActivity());
             if (nfcAdapter != null) {
                 try {
-                    // Create IntentFilters array based on the MIME type filter
-                    IntentFilter[] filters = new IntentFilter[mimeTypeFilter.size() + 1];
-                    int i = 0;
-                    for (String mimeType : mimeTypeFilter) {
-                        IntentFilter filter = new IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED);
-                        filter.addDataType(mimeType); // Add MIME type to filter
-                        filters[i++] = filter;
-                    }
-
-                    // Add a tech filter for tech discovery (always included)
-                    filters[i] = new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED);
-
                     // Update the global intentFiltersArray and techListsArray
-                    intentFiltersArray = filters;
+                    intentFiltersArray = new IntentFilter[3];
+                    intentFiltersArray[0] = new IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED);
+                    intentFiltersArray[1] = new IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED);
+                    intentFiltersArray[2] = new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED);
+                    
                     techListsArray = new String[][] { new String[] { Ndef.class.getName() }, new String[] { NdefFormatable.class.getName() } };
 
                     // Enable foreground dispatch with the updated filters
                     nfcAdapter.enableForegroundDispatch(getActivity(), getPendingIntent(), intentFiltersArray, techListsArray);
-
-                    debug = "startNfc: All set correctly.";
-
-                } catch (IntentFilter.MalformedMimeTypeException e) {
-                    e.printStackTrace(); // Log or handle this error
-                    debug = "startNfc: Filters not applied successfully: " + e.toString();
                 } catch (Exception ex) {
                     // Handle other potential exceptions
                     ex.printStackTrace();
-                    debug = "startNfc: non filter exception: " + ex.toString();
                 }
             }
         });
@@ -381,6 +377,9 @@ public class NfcPlugin extends CordovaPlugin {
     }
 
     private void handleNfcIntent(Intent intent) {
+        if(intent == null)
+          return;
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             currentTag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag.class);
         } else {
@@ -401,11 +400,18 @@ public class NfcPlugin extends CordovaPlugin {
                     event.put("tagSerial", getTagSerialNumber(currentTag));
 
                     String mimeType = getMimeType(record);
-                    if (mimeType != null && mimeType.length() > 0) {
+                    if (mimeType != null && mimeType.length() > 0) { //Record has a mime type
+
+                      //If we have defined filter and the mime type is not there -> ignore the ndef record
+                      if(mimeTypeFilter.size() > 0 && !mimeTypeFilter.contains(mimeType)) 
+                          continue;
+
                       event.put("mimeType", mimeType);
                     }
+                    else if(mimeTypeFilter.size() > 0) //Record has no mime type but our filter list does -> ignore the record
+                      continue;
 
-                    event.put("debug", debug);
+                    //event.put("debug", debug);
 
                     event.put("ndefData", payloadToArray(record.getPayload()));
                     PluginResult result = new PluginResult(PluginResult.Status.OK, event);
