@@ -394,6 +394,13 @@ public class NfcPlugin extends CordovaPlugin {
         if (ndef != null && ndefCallbackContext != null) {
             try {
                 NdefMessage ndefMessage = ndef.getCachedNdefMessage();
+                if(ndefMessage == null) {
+                  JSONObject event = new JSONObject();
+                  event.put("tagSerial", getTagSerialNumber(currentTag));
+                  event.put("ndefData", null);
+                  return;
+                }
+
                 NdefRecord[] records = ndefMessage.getRecords();
                 for (NdefRecord record : records) {
                     JSONObject event = new JSONObject();
