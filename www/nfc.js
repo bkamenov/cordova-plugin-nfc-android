@@ -64,6 +64,105 @@ const NFC = {
   showSettings: function (success, error) {
     exec(success, error, 'NfcPlugin', 'showSettings', []);
   },
+  /**
+   * Begins a read session for detectig a tag.
+   * 
+   * Parameters:
+   * 
+   * success - the success calback with the scanned tag as single argument.
+   * The tag has following structure:
+   * {
+   *    tagSerial: string; // e.g. 12:AB:FF:33:CD:D0:B2
+   *    ndefRecords: [
+   *      {
+   *        id: ArrayBuffer | null;
+   *        tnf: number; // Integer represnting record TNF as in NFC spec.
+   *        mimeType: string | null; // e.g. text/plain OR null
+   *        ndefData: JSONArray; // array of unsigned integers for each NDEF data byte or empty for no data
+   *      },
+   *      ...
+   *    ]
+   * } 
+   * 
+   * Example usage:
+   * 
+   * // 1. Read only example
+   * cordova.plugins.NFC.beginScanSession(
+   * (tag) => {
+   *  console.log("TAG SERIAL: " + tag.tagSerial);
+   * 
+   *  for(const record of tag.ndefRecords) {
+   *    console.log("MIME: " + record.mimeType);
+   *    console.log("TNF: " + record.tnf.toString());
+   *    console.log("DATA SIZE: " + record.ndefData.length.toString());
+   *    //record.id
+   *  }
+   * 
+   *  // Explicit call of endSession to end the session
+   *  cordova.plugins.NFC.endSession(() => { console.log("Session ended."); });
+   * },
+   * (error) => {
+   *    console.log("Session closed or error reading tag: " + error);
+   * });
+   * 
+   * // 2. Read and write example
+   * cordova.plugins.NFC.beginScanSession(
+   * (tag) => {
+   *  console.log("TAG SERIAL: " + tag.tagSerial);
+   * 
+   *  for(const record of tag.ndefRecords) {
+   *    console.log("MIME: " + record.mimeType);
+   *    console.log("TNF: " + record.tnf.toString());
+   *    console.log("DATA SIZE: " + record.ndefData.length.toString());
+   *    //record.id
+   *  }
+   * 
+   *  const text = "Hello world";
+   *  const encoder = new TextEncoder();
+   * 
+   *  // The call to write will use the existing session to write the data
+   *  // and then close the session
+   *  cordova.plugins.NFC.write(
+   *  [  
+   *    {
+   *      id: cordova.plugins.NFC.unset(),
+   *      tnf: cordova.plugins.NFC.TNF_MEDIA,
+   *      mimeType: "text/plain",
+   *      ndefData: encoder.encode(text).buffer
+   *    }, 
+   *  ]
+   *  () => {
+   *    // Called on write success
+   *    console.log("Write successful.");
+   * 
+   *    // The session will be closed here automatically.
+   *  },
+   *  (error) => {
+   *    console.log("Error writing tag: " + error);
+   *  });
+   * },
+   * (error) => {
+   *   console.log("Error reading tag: " + error);
+   * });
+   */
+  beginScanSession: function (success, error, alertMessage) {
+    exec((tag) => {
+      const transformedTag = { 
+        tagSerial: tag.tagSerial,
+        ndefRecords: []
+      };
+      for(const ndef of tag.ndefRecords) {
+        transformedTag.ndefRecords.push({
+          id: intArrayToArrayBuffer(ndef.id),
+          tnf: ndef.tnf,
+          mimeType: ndef.mimeType,
+          ndefData: intArrayToArrayBuffer(ndef.ndefData)
+        });
+      }
+      success(transformedTag);
+    },
+    error, 'NfcPlugin', 'beginScanSession', []);
+  },
 
   /**
    * Writes records to NDEF tag.
@@ -92,6 +191,17 @@ const NFC = {
       transformedRecords.push(record);
     }
     exec(success, error, 'NfcPlugin', 'write', [transformedRecords]);
+  },
+
+  /**
+   * Terminate the session.
+   * 
+   * success - called if session is closed.
+   * 
+   * error - error callback for future use. Not called.
+   */
+  endSession: function (success, error) {
+    exec(success, error, 'NfcPlugin', 'endSession', []);
   }
 };
 
@@ -105,36 +215,11 @@ function intArrayToArrayBuffer(intArray) {
 }
 
 require('cordova/channel').onCordovaReady.subscribe(() => {
-  exec((tag) => {
-    const transformedTag = { 
-      tagSerial: tag.tagSerial,
-      ndefRecords: []
-    };
-    for(const ndef of tag.ndefRecords) {
-      transformedTag.ndefRecords.push({
-        id: intArrayToArrayBuffer(ndef.id),
-        tnf: ndef.tnf,
-        mimeType: ndef.mimeType,
-        ndefData: intArrayToArrayBuffer(ndef.ndefData)
-      });
-    }
-    var tagEvent = new CustomEvent("ndef-tag", { detail: transformedTag });
-    document.dispatchEvent(tagEvent);
-  }, null, 'NfcPlugin', 'setTagListener', []);
-
   exec((event) => {
     var stateChangeEvent = new CustomEvent("nfcstatechange", { detail: event });
     document.dispatchEvent(stateChangeEvent);
   }, null, 'NfcPlugin', 'setStateChangeListener', []);
 
 });
-
-// Wait for onther stuff to be loaded and then fire the launhing ndef intent (if any)
-document.addEventListener("deviceready", () => {
-  setTimeout(() => {
-    exec(null, null, 'NfcPlugin', 'beginNfc', []);
-    exec(null, null, 'NfcPlugin', 'handleLaunchNfcIntent', []);
-  }, 0);
-}, false);
 
 module.exports = NFC;
