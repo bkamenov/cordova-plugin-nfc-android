@@ -11,7 +11,6 @@ cordova plugin add cordova-plugin-nfc-android
 ```
 
 
-
 For latest releases type:
 
 ```shell
@@ -38,16 +37,6 @@ cordova.plugins.NFC.askForPermission(
     console.log('NFC permission granted:', granted); //1 - granted, 0 - not granted
   });
 
-// Set MIME type filter - set a list of MIME types for the NDEF messages you want to read.
-// If not set, all NDEF messages will be read.
-cordova.plugins.NFC.setMimeTypeFilter(["text/plain"],
-  () => {
-    console.log('MIME type filter set');
-  },
-  (error: string) => {
-    console.error('Failed to set MIME type filter:', error);
-  });
-
 // Helper function
 function arrayBufferToString(buffer) {
   const decoder = new TextDecoder('utf-8');
@@ -56,23 +45,28 @@ function arrayBufferToString(buffer) {
 }
 
 // Listen for NDEF tags
-document.addEventListener('ndef',
+document.addEventListener('ndef-tag',
   (event) => {
-    const ndef = event.detail;
-    console.log("NDEF tag detected: " + ndef.tagSerial);
-    if (ndef.mimeType) // MIME type is optional field and may not be set on all NDEF tags
-      console.log("NDEF tag MIME: " + ndef.mimeType);
-    console.log("NDEF data as text: " + arrayBufferToString(ndef.ndefData));
+    const tag = event.detail;
+    console.log("NDEF tag detected: " + tag.tagSerial);
+    for(const record of tag.ndefRecords) {
+      console.log("Record MIME: " + record.mimeType);
+      console.log("Record data as text: " + arrayBufferToString(record.ndefData));
+      // record.tnf
+      // record.id
+    }
 
     // Write NDEF message when a tag is detected (This step is optional,
     // because you are not obligated to write to tags.)
-    const message = {
+    const ndefRecord = {
+      tnf: cordova.plugins.NFC.TNF_MEDIA,
+      id: cordova.plugins.NFC.unset(),
       mimeType: "text/plain", // mimeType is optional
       ndefData: new TextEncoder().encode("My message").buffer
     };
     // The write command should be run in the context of read. 
     // Otherwise, the behavior is unknown.
-    cordova.plugins.NFC.write(message,
+    cordova.plugins.NFC.write([ndefRecord],
       () => {
         console.log('NDEF message written successfully');
       },

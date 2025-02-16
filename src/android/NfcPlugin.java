@@ -24,8 +24,11 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class NfcPlugin extends CordovaPlugin {
@@ -39,7 +42,6 @@ public class NfcPlugin extends CordovaPlugin {
     private CallbackContext permissionCallbackContext;
     private CallbackContext writeCallbackContext;
     private Tag currentTag;
-    private Set<String> mimeTypeFilter = new HashSet<>();
     private PendingIntent pendingIntent;
     private IntentFilter[] intentFiltersArray;
     private String[][] techListsArray;
@@ -81,18 +83,13 @@ public class NfcPlugin extends CordovaPlugin {
             return true;
         }
 
-        if(action.equals("setNdefListener")) {
+        if(action.equals("setTagListener")) {
             setNdefListener(callbackContext);
             return true;
         }
 
         if (action.equals("setStateChangeListener")) {
             setStateChangeListener(callbackContext);
-            return true;
-        }
-
-        if(action.equals("setMimeTypeFilter")) {
-            setMimeTypeFilter(args, nfcStatus, callbackContext);
             return true;
         }
 
@@ -158,18 +155,24 @@ public class NfcPlugin extends CordovaPlugin {
                 return;
             }
 
-            JSONObject message = args.getJSONObject(0);
-            String mimeType = message.has("mimeType") ? message.getString("mimeType") : null;
-            byte[] ndefData = toByteArray(message.getJSONArray("ndefData"));
+            JSONArray records = args.getJSONArray(0);
 
-            NdefRecord ndefRecord;
-            if (mimeType != null) {
-                ndefRecord = NdefRecord.createMime(mimeType, ndefData);
-            } else {
-                ndefRecord = new NdefRecord(NdefRecord.TNF_MIME_MEDIA, new byte[0], new byte[0], ndefData);
+            List<NdefRecord> recordList = new ArrayList<>();
+
+            for (int i = 0; i < records.length(); i++) {
+                JSONObject recordJson = records.getJSONObject(i);
+    
+                short tnf = (short) recordJson.getInt("tnf"); // Extract TNF
+                byte[] id = toByteArray(recordJson.getJSONArray("id")); // Extract ID
+                byte[] payload = toByteArray(recordJson.getJSONArray("ndefData")); // Extract Payload
+                byte[] type = recordJson.getString("mimeType").isEmpty() ? new byte[0] : recordJson.getString("mimeType").getBytes(StandardCharsets.UTF_8);
+    
+                // Create NdefRecord
+                NdefRecord record = new NdefRecord(tnf, type, id, payload);
+                recordList.add(record);
             }
-            
-            NdefMessage ndefMessage = new NdefMessage(new NdefRecord[]{ndefRecord});
+
+            NdefMessage ndefMessage = new NdefMessage(recordList.toArray(new NdefRecord[recordList.size()]));
 
             writeCallbackContext = callbackContext;
             writeTag(currentTag, ndefMessage);
@@ -201,20 +204,6 @@ public class NfcPlugin extends CordovaPlugin {
       } catch (Exception e) {
           callbackContext.error("Failed to begin listening for NFC intents. Error: " + e.toString());
       }
-    }
-
-    private void setMimeTypeFilter(JSONArray args, String nfcStatus, CallbackContext callbackContext) {
-        try {
-            mimeTypeFilter.clear();
-            JSONArray filterArray = args.getJSONArray(0);
-            for (int i = 0; i < filterArray.length(); i++) {
-                mimeTypeFilter.add(filterArray.getString(i));
-            }
-
-            callbackContext.success();
-        } catch (JSONException e) {
-            callbackContext.error("Failed to set MIME type filter");
-        }
     }
 
     private Activity getActivity() {
@@ -281,37 +270,6 @@ public class NfcPlugin extends CordovaPlugin {
             }
         });
     }
-
-    // private void startNfc() {
-    //     getActivity().runOnUiThread(() -> {
-    //         NfcAdapter nfcAdapter = NfcAdapter.getDefaultAdapter(getActivity());
-    //         if (nfcAdapter != null) {
-    //             IntentFilter[] filters = new IntentFilter[mimeTypeFilter.size() + 1];
-    //             int i = 0;
-    //             for (String mimeType : mimeTypeFilter) {
-    //                 IntentFilter filter = new IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED);
-    //                 try {
-    //                     filter.addDataType(mimeType);
-    //                 } catch (IntentFilter.MalformedMimeTypeException e) {
-    //                     e.printStackTrace();
-    //                 }
-    //                 filters[i++] = filter;
-    //             }
-    //             // Always add a tech filter to handle TECH_DISCOVERED actions
-    //             filters[i] = new IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED);
-
-    //             intentFiltersArray = filters;
-    //             techListsArray = new String[][]{new String[]{Ndef.class.getName()}, new String[]{NdefFormatable.class.getName()}};
-
-    //             try {
-    //                 nfcAdapter.enableForegroundDispatch(getActivity(), getPendingIntent(), intentFiltersArray, techListsArray);
-    //             }
-    //             catch(Exception ex) {
-    //                 //App is possibly terminating
-    //             }
-    //         }
-    //     });
-    // }
 
     private void stopNfc() {
         getActivity().runOnUiThread(() -> {
@@ -389,51 +347,42 @@ public class NfcPlugin extends CordovaPlugin {
         if(currentTag == null)
           return;
 
-        Ndef ndef = Ndef.get(currentTag);
+        try {
+            Ndef ndef = Ndef.get(currentTag);
+            JSONObject ndefTag = new JSONObject();
+            JSONArray ndefRecords = new JSONArray();
+            ndefTag.put("tagSerial", getTagSerialNumber(currentTag));
+            ndefTag.put("ndefRecords", ndefRecords);
 
-        if (ndef != null && ndefCallbackContext != null) {
-            try {
+            if (ndef != null && ndefCallbackContext != null) {
                 NdefMessage ndefMessage = ndef.getCachedNdefMessage();
-                if(ndefMessage == null) {
-                  JSONObject event = new JSONObject();
-                  event.put("tagSerial", getTagSerialNumber(currentTag));
-                  event.put("ndefData", null);
-                  return;
-                }
+                if(ndefMessage != null) {
+                    NdefRecord[] records = ndefMessage.getRecords();
+                    for (NdefRecord record : records) {
+                        JSONObject ndefRecord = new JSONObject();
+                        
+                        ndefRecord.put("tnf", record.getTnf());
+                        ndefRecord.put("mimeType", new String(record.getType(), StandardCharsets.UTF_8));
+                        ndefRecord.put("id", byteArrayToJSONArray(record.getId()));
+                        ndefRecord.put("ndefData", byteArrayToJSONArray(record.getPayload()));
 
-                NdefRecord[] records = ndefMessage.getRecords();
-                for (NdefRecord record : records) {
-                    JSONObject event = new JSONObject();
-                    event.put("tagSerial", getTagSerialNumber(currentTag));
-
-                    String mimeType = getMimeType(record);
-                    if (mimeType != null && mimeType.length() > 0) { //Record has a mime type
-
-                      //If we have defined filter and the mime type is not there -> ignore the ndef record
-                      if(mimeTypeFilter.size() > 0 && !mimeTypeFilter.contains(mimeType)) 
-                          continue;
-
-                      event.put("mimeType", mimeType);
+                        ndefRecords.put(ndefRecord);
                     }
-                    else if(mimeTypeFilter.size() > 0) //Record has no mime type but our filter list does -> ignore the record
-                      continue;
-
-                    //event.put("debug", debug);
-
-                    event.put("ndefData", payloadToArray(record.getPayload()));
-                    PluginResult result = new PluginResult(PluginResult.Status.OK, event);
-                    result.setKeepCallback(true);
-                    ndefCallbackContext.sendPluginResult(result);
                 }
-            } catch (JSONException e) {
-                e.printStackTrace();
             }
+
+            PluginResult result = new PluginResult(PluginResult.Status.OK, ndefTag);
+            result.setKeepCallback(true);
+            ndefCallbackContext.sendPluginResult(result);
+        }
+        catch (JSONException e) {
+            e.printStackTrace();
         }
     }
 
-    private JSONArray payloadToArray(byte[] payload) throws JSONException {
+    private JSONArray byteArrayToJSONArray(byte[] data) throws JSONException {
         JSONArray jsonArray = new JSONArray();
-        for (byte b : payload) {
+        for (byte b : data) {
             jsonArray.put(b & 0xFF);  // Convert to unsigned integer
         }
         return jsonArray;
@@ -448,17 +397,6 @@ public class NfcPlugin extends CordovaPlugin {
         return sb.substring(0, sb.length() - 1);
     }
 
-    private String getMimeType(NdefRecord record) {
-        try {
-            if (record.getTnf() == NdefRecord.TNF_MIME_MEDIA) {
-                return new String(record.getType(), "US-ASCII");
-            }
-        } catch (UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
-
     private void writeTag(Tag tag, NdefMessage message) {
         try {
             Ndef ndef = Ndef.get(tag);
@@ -466,9 +404,9 @@ public class NfcPlugin extends CordovaPlugin {
                 ndef.connect();
                 if (ndef.isWritable()) {
                     ndef.writeNdefMessage(message);
-                    writeCallbackContext.success("NDEF message written successfully");
+                    writeCallbackContext.success();
                 } else {
-                    writeCallbackContext.error("NDEF tag is not writable");
+                    writeCallbackContext.error("NDEF tag is not writable.");
                 }
                 ndef.close();
             } else {
@@ -476,10 +414,10 @@ public class NfcPlugin extends CordovaPlugin {
                 if (formatable != null) {
                     formatable.connect();
                     formatable.format(message);
-                    writeCallbackContext.success("NDEF tag formatted and message written successfully");
+                    writeCallbackContext.success();
                     formatable.close();
                 } else {
-                    writeCallbackContext.error("Tag does not support NDEF");
+                    writeCallbackContext.error("Tag does not support NDEF.");
                 }
             }
         } catch (Exception e) {
