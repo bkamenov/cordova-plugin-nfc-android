@@ -93,8 +93,9 @@ public class NfcPlugin extends CordovaPlugin {
             return true;
         }
 
-        if(action.equals("endSession")) {
-            endSession(callbackContext);
+        if(action.equals("startIntentMonitoring")) {
+            startIntentMonitoring();
+            callbackContext.success();
             return true;
         }
         
@@ -135,10 +136,6 @@ public class NfcPlugin extends CordovaPlugin {
         isWriteMode = false;
         sessionCallbackContext = callbackContext;
         ndefSession = null;
-
-        if (nfcAdapter != null) {
-            nfcAdapter.enableForegroundDispatch(getActivity(), pendingIntent, null, null);
-        }
     }
 
     private void write(JSONArray args, CallbackContext callbackContext) {
@@ -175,11 +172,6 @@ public class NfcPlugin extends CordovaPlugin {
         
         if(reusingSession) {
             writeNdefTag();
-        }
-        else {
-            if (nfcAdapter != null) {
-                nfcAdapter.enableForegroundDispatch(getActivity(), pendingIntent, null, null);
-            }
         }
     }
 
@@ -306,9 +298,7 @@ public class NfcPlugin extends CordovaPlugin {
 
                     if(currentNfcEnabledState) {
                         getActivity().runOnUiThread(() -> {
-                            if (nfcAdapter != null) {
-                                nfcAdapter.enableForegroundDispatch(getActivity(), pendingIntent, null, null);
-                            }
+                            startIntentMonitoring();
                         });
                     }
 
@@ -361,22 +351,28 @@ public class NfcPlugin extends CordovaPlugin {
         }
     }
 
-    @Override
-    public void onPause(boolean multitasking) {
-        super.onPause(multitasking);
-        
+    private void startIntentMonitoring() {
+        if (nfcAdapter != null) {
+            nfcAdapter.enableForegroundDispatch(getActivity(), pendingIntent, null, null);
+        }
+    }
+
+    private void stopIntentMonitoring() {
         if (nfcAdapter != null) {
             nfcAdapter.disableForegroundDispatch(cordova.getActivity());
         }
     }
 
     @Override
+    public void onPause(boolean multitasking) {
+        super.onPause(multitasking);
+        stopIntentMonitoring();
+    }
+
+    @Override
     public void onResume(boolean multitasking) {
         super.onResume(multitasking);
-
-        if (nfcAdapter != null) {
-            nfcAdapter.enableForegroundDispatch(getActivity(), pendingIntent, null, null);
-        }
+        startIntentMonitoring();
     }
 
     @Override

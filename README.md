@@ -64,8 +64,7 @@ cordova.plugins.NFC.beginScanSession(
   },
   (error) => {
     console.log("Session closed or error reading tag: " + error);
-  },
-  "Hold your phone near an NFC tag.");
+  });
 ```
 
 ```js
@@ -101,14 +100,11 @@ cordova.plugins.NFC.beginScanSession(
       },
       (error) => {
         console.log("Session closed or error writing tag: " + error);
-      },
-      "Hold your phone near an NFC tag.",
-      "Data has been successfully written.");
+      });
   },
   (error) => {
     console.log("Session closed or error reading tag: " + error);
-  },
-  "Hold your phone near an NFC tag.");
+  });
 ```
 
 ```js
