@@ -383,32 +383,30 @@ public class NfcPlugin extends CordovaPlugin {
     }
 
     private void handleTag(Tag tag) {
-        getActivity().runOnUiThread(() -> {
-            if(sessionCallbackContext == null)
-                return; // Nobody is currently interestend in tag scans
+        if(sessionCallbackContext == null)
+            return; // Nobody is currently interestend in tag scans
 
-            ndefSession = Ndef.get(tag);
-            if(ndefSession == null) {
-                sendSessionError("This tag does not support NDEF.");
-                closeSession();
-                return;
-            }
+        ndefSession = Ndef.get(tag);
+        if(ndefSession == null) {
+            sendSessionError("This tag does not support NDEF.");
+            closeSession();
+            return;
+        }
 
-            try {
-                ndefSession.connect();  // Attempt to connect to the tag
-            }
-            catch(Exception e) {
-                sendSessionError("Error connecting to tag.");
-                closeSession();
-            }
+        try {
+            ndefSession.connect();  // Attempt to connect to the tag
+        }
+        catch(Exception e) {
+            sendSessionError("Error connecting to tag.");
+            closeSession();
+        }
 
-            if(isWriteMode) {
-                writeNdefTag();
-            }
-            else {
-                readNdefTag(tag);
-            }
-        });
+        if(isWriteMode) {
+            writeNdefTag();
+        }
+        else {
+            readNdefTag(tag);
+        }
     }
 
     // Utility functions
