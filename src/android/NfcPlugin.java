@@ -337,8 +337,8 @@ public class NfcPlugin extends CordovaPlugin {
 
     private void enableNfcReaderMode() {
         if (nfcAdapter != null) {
-            Bundle options = new Bundle();
-            options.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250); // Reduces latency
+            //Bundle options = new Bundle();
+            //options.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250); // Reduces latency
 
             nfcAdapter.enableReaderMode(
                 getActivity(),
@@ -353,7 +353,7 @@ public class NfcPlugin extends CordovaPlugin {
                 NfcAdapter.FLAG_READER_NFC_F |
                 NfcAdapter.FLAG_READER_NFC_V |
                 NfcAdapter.FLAG_READER_NFC_BARCODE,
-                options
+                null //options
             );
         }
     }
