@@ -225,7 +225,7 @@ require('cordova/channel').onCordovaReady.subscribe(() => {
 //Wait for onther stuff to be loaded and then fire the launhing ndef intent (if any)
 document.addEventListener("deviceready", () => {
   setTimeout(() => {
-    exec(null, null, 'NfcPlugin', 'startIntentMonitoring', []);
+    exec(null, null, 'NfcPlugin', 'startNfcMonitoring', []);
   }, 0);
 }, false);
 

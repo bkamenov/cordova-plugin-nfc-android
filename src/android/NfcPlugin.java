@@ -45,7 +45,6 @@ public class NfcPlugin extends CordovaPlugin {
     private CallbackContext permissionCallbackContext = null;
    
     private NfcAdapter nfcAdapter = null;
-    private PendingIntent pendingIntent = null;
     private BroadcastReceiver nfcStateReceiver = null;
     private boolean lastNfcEnabledState = false;
     private boolean isWriteMode = false;
@@ -56,7 +55,6 @@ public class NfcPlugin extends CordovaPlugin {
     protected void pluginInitialize() {
         nfcAdapter = NfcAdapter.getDefaultAdapter(getActivity());
         lastNfcEnabledState = getNfcStatus().equals(STATUS_NFC_OK);
-        createPendingIntent();
         registerNfcStateReceiver();
     }
 
@@ -93,8 +91,8 @@ public class NfcPlugin extends CordovaPlugin {
             return true;
         }
 
-        if(action.equals("startIntentMonitoring")) {
-            startIntentMonitoring();
+        if(action.equals("startNfcMonitoring")) {
+            enableNfcReaderMode();
             callbackContext.success();
             return true;
         }
@@ -298,7 +296,7 @@ public class NfcPlugin extends CordovaPlugin {
 
                     if(currentNfcEnabledState) {
                         getActivity().runOnUiThread(() -> {
-                            startIntentMonitoring();
+                            enableNfcReaderMode();
                         });
                     }
 
@@ -336,43 +334,46 @@ public class NfcPlugin extends CordovaPlugin {
     private Intent getIntent() {
         return getActivity().getIntent();
     }
-  
-    private void createPendingIntent() {
-        if (pendingIntent == null) {
-            Activity activity = getActivity();
-            Intent intent = new Intent(activity, activity.getClass());
-            intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            
-            int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M)
-                pendingIntentFlags |= PendingIntent.FLAG_MUTABLE;
 
-            pendingIntent = PendingIntent.getActivity(activity, 0, intent, pendingIntentFlags);
+    private void enableNfcReaderMode() {
+        if (nfcAdapter != null) {
+            Bundle options = new Bundle();
+            options.putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250); // Reduces latency
+
+            nfcAdapter.enableReaderMode(
+                getActivity(),
+                new NfcAdapter.ReaderCallback() {
+                    @Override
+                    public void onTagDiscovered(Tag tag) {
+                        handleTag(tag);
+                    }
+                },
+                NfcAdapter.FLAG_READER_NFC_A |
+                NfcAdapter.FLAG_READER_NFC_B |
+                NfcAdapter.FLAG_READER_NFC_F |
+                NfcAdapter.FLAG_READER_NFC_V |
+                NfcAdapter.FLAG_READER_NFC_BARCODE,
+                options
+            );
         }
     }
 
-    private void startIntentMonitoring() {
+    private void disableNfcReaderMode() {
         if (nfcAdapter != null) {
-            nfcAdapter.enableForegroundDispatch(getActivity(), pendingIntent, null, null);
-        }
-    }
-
-    private void stopIntentMonitoring() {
-        if (nfcAdapter != null) {
-            nfcAdapter.disableForegroundDispatch(cordova.getActivity());
+            nfcAdapter.disableReaderMode(getActivity());
         }
     }
 
     @Override
     public void onPause(boolean multitasking) {
         super.onPause(multitasking);
-        stopIntentMonitoring();
+        disableNfcReaderMode();
     }
 
     @Override
     public void onResume(boolean multitasking) {
         super.onResume(multitasking);
-        startIntentMonitoring();
+        enableNfcReaderMode();
     }
 
     @Override
@@ -381,45 +382,33 @@ public class NfcPlugin extends CordovaPlugin {
         unregisterNfcStateReceiver();
     }
 
-    @Override
-    public void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
+    private void handleTag(Tag tag) {
+        getActivity().runOnUiThread(() -> {
+            if(sessionCallbackContext == null)
+                return; // Nobody is currently interestend in tag scans
 
-        if(sessionCallbackContext == null)
-            return; // Nobody is currently interestend in tag scans
+            ndefSession = Ndef.get(tag);
+            if(ndefSession == null) {
+                sendSessionError("This tag does not support NDEF.");
+                closeSession();
+                return;
+            }
 
-        Tag tag;
+            try {
+                ndefSession.connect();  // Attempt to connect to the tag
+            }
+            catch(Exception e) {
+                sendSessionError("Error connecting to tag.");
+                closeSession();
+            }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag.class);
-        } else {
-            tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-        }
-
-        if(tag == null)
-          return;
-
-        ndefSession = Ndef.get(tag);
-        if(ndefSession == null) {
-            sendSessionError("This tag does not support NDEF.");
-            closeSession();
-            return;
-        }
-
-        try {
-            ndefSession.connect();  // Attempt to connect to the tag
-        }
-        catch(Exception e) {
-            sendSessionError("Error connecting to tag.");
-            closeSession();
-        }
-
-        if(isWriteMode) {
-            writeNdefTag();
-        }
-        else {
-            readNdefTag(tag);
-        }
+            if(isWriteMode) {
+                writeNdefTag();
+            }
+            else {
+                readNdefTag(tag);
+            }
+        });
     }
 
     // Utility functions
