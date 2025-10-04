@@ -14,11 +14,11 @@ const NFC = {
   TNF_RESERVED: 0x07, // Reserved (do not use)
 
   /**
-   * Use this method to set empty data for id or ndefData
+   * Use this method to set empty data for id or payload
    * in a NDEF record. 
    */
-  unset: function () { 
-    return new ArrayBuffer(0); 
+  unset: function () {
+    return new ArrayBuffer(0);
   },
 
   /**
@@ -72,13 +72,13 @@ const NFC = {
    * success - the success calback with the scanned tag as single argument.
    * The tag has following structure:
    * {
-   *    tagSerial: string; // e.g. 12:AB:FF:33:CD:D0:B2
+   *    serial: ArrayBuffer;
    *    ndefRecords: [
    *      {
-   *        id: ArrayBuffer | null;
+   *        id: ArrayBuffer; // array of unsigned integers for each id byte or empty for no id
    *        tnf: number; // Integer represnting record TNF as in NFC spec.
-   *        mimeType: string | null; // e.g. text/plain OR null
-   *        ndefData: JSONArray; // array of unsigned integers for each NDEF data byte or empty for no data
+   *        type: ArrayBuffer; // e.g. text/plain OR null
+   *        payload: ArrayBuffer; // array of unsigned integers for each NDEF data byte or empty for no data
    *      },
    *      ...
    *    ]
@@ -89,13 +89,21 @@ const NFC = {
    * // 1. Read only example
    * cordova.plugins.NFC.beginScanSession(
    * (tag) => {
-   *  console.log("TAG SERIAL: " + tag.tagSerial);
    * 
+   *  function arrayBufferToHex(buffer) {
+   *    const bytes = new Uint8Array(buffer);
+   *    return Array.from(bytes)
+   *      .map(b => b.toString(16).padStart(2, '0').toUpperCase())
+   *      .join(' ');
+   *  }
+   *
+   *  console.log("TAG SERIAL: " + arrayBufferToHex(tag.serial));
+   *
    *  for(const record of tag.ndefRecords) {
-   *    console.log("MIME: " + record.mimeType);
    *    console.log("TNF: " + record.tnf.toString());
-   *    console.log("DATA SIZE: " + record.ndefData.length.toString());
+   *    console.log("DATA SIZE: " + record.payload.length.toString());
    *    //record.id
+   *    //record.type
    *  }
    * 
    *  // Explicit call of endSession to end the session
@@ -108,13 +116,21 @@ const NFC = {
    * // 2. Read and write example
    * cordova.plugins.NFC.beginScanSession(
    * (tag) => {
-   *  console.log("TAG SERIAL: " + tag.tagSerial);
+   * 
+   *  function arrayBufferToHex(buffer) {
+   *    const bytes = new Uint8Array(buffer);
+   *    return Array.from(bytes)
+   *      .map(b => b.toString(16).padStart(2, '0').toUpperCase())
+   *      .join(' ');
+   *  }
+   * 
+   *  console.log("TAG SERIAL: " + arrayBufferToHex(tag.serial));
    * 
    *  for(const record of tag.ndefRecords) {
-   *    console.log("MIME: " + record.mimeType);
    *    console.log("TNF: " + record.tnf.toString());
-   *    console.log("DATA SIZE: " + record.ndefData.length.toString());
+   *    console.log("DATA SIZE: " + record.payload.length.toString());
    *    //record.id
+   *    //record.type
    *  }
    * 
    *  const text = "Hello world";
@@ -127,8 +143,8 @@ const NFC = {
    *    {
    *      id: cordova.plugins.NFC.unset(),
    *      tnf: cordova.plugins.NFC.TNF_MEDIA,
-   *      mimeType: "text/plain",
-   *      ndefData: encoder.encode(text).buffer
+   *      type: encoder.encode("text/plain").buffer,
+   *      payload: encoder.encode(text).buffer
    *    }, 
    *  ]
    *  () => {
@@ -147,21 +163,20 @@ const NFC = {
    */
   beginScanSession: function (success, error, alertMessage) {
     exec((tag) => {
-      const transformedTag = { 
-        tagSerial: tag.tagSerial,
+      const transformedTag = {
+        serial: intArrayToArrayBuffer(tag.serial),
         ndefRecords: []
       };
-      for(const ndef of tag.ndefRecords) {
+      for (const ndef of tag.ndefRecords) {
         transformedTag.ndefRecords.push({
           id: intArrayToArrayBuffer(ndef.id),
           tnf: ndef.tnf,
-          mimeType: ndef.mimeType,
-          ndefData: intArrayToArrayBuffer(ndef.ndefData)
+          type: intArrayToArrayBuffer(ndef.type),
+          payload: intArrayToArrayBuffer(ndef.payload)
         });
       }
       success(transformedTag);
-    },
-    error, 'NfcPlugin', 'beginScanSession', []);
+    }, error, 'NfcPlugin', 'beginScanSession', []);
   },
 
   /**
@@ -173,20 +188,20 @@ const NFC = {
    *   {
    *     id: ArrayBuffer; // Use cordova.plugins.NFC.unset() if not used or empty.
    *     tnf: number; // Use one of the TNF_* values from cordova.plugins.NFC
-   *     mimeType: string; // The mime type as by the NFC RFC.
-   *     ndefData: ArrayBuffer; // The payload or cordova.plugins.NFC.unset() if not used or empty.
+   *     type: ArrayBuffer; // The RTD as by the NFC RFC. Use cordova.plugins.NFC.unset() if not used or empty.
+   *     payload: ArrayBuffer; // The payload or cordova.plugins.NFC.unset() if not used or empty.
    *   }
    * - success - called upon success without any arguments.
    * - error - called on error with a string argument with error description.
    */
   write: function (ndefRecords, success, error) {
     const transformedRecords = [];
-    for(const ndef of ndefRecords) {
+    for (const ndef of ndefRecords) {
       const record = {
         id: Array.from(new Uint8Array(ndef.id)),
         tnf: ndef.tnf,
-        mimeType: ndef.mimeType,
-        ndefData: Array.from(new Uint8Array(ndef.ndefData))
+        type: Array.from(new Uint8Array(ndef.type)),
+        payload: Array.from(new Uint8Array(ndef.payload))
       }
       transformedRecords.push(record);
     }
