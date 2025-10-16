@@ -81,6 +81,11 @@ public class NfcPlugin extends CordovaPlugin {
             return true;
         }
 
+        if(action.equals("endSession")) {
+            endSession(callbackContext);
+            return true;
+        }
+
         if (action.equals("setStateChangeListener")) {
             setStateChangeListener(callbackContext);
             return true;
@@ -136,6 +141,11 @@ public class NfcPlugin extends CordovaPlugin {
         ndefSession = null;
     }
 
+    private void endSession(CallbackContext callbackContext) {
+        closeSession();
+        callbackContext.success();
+    }
+
     private void write(JSONArray args, CallbackContext callbackContext) {
         boolean reusingSession = false;
         isWriteMode = true;
@@ -150,9 +160,9 @@ public class NfcPlugin extends CordovaPlugin {
     
                 short tnf = (short) recordJson.getInt("tnf"); // Extract TNF
                 byte[] id = JSONArrayToByteArray(recordJson.getJSONArray("id")); // Extract ID
-                byte[] payload = JSONArrayToByteArray(recordJson.getJSONArray("ndefData")); // Extract Payload
-                byte[] type = recordJson.getString("mimeType").isEmpty() ? new byte[0] : recordJson.getString("mimeType").getBytes(StandardCharsets.UTF_8);
-    
+                byte[] payload = JSONArrayToByteArray(recordJson.getJSONArray("payload")); // Extract Payload
+                byte[] type = JSONArrayToByteArray(recordJson.getJSONArray("type")); // Extract Type
+
                 // Create NdefRecord
                 NdefRecord record = new NdefRecord(tnf, type, id, payload);
                 recordList.add(record);
@@ -173,11 +183,6 @@ public class NfcPlugin extends CordovaPlugin {
         }
     }
 
-    private void endSession(CallbackContext callbackContext) {
-        closeSession();
-        callbackContext.success();
-    }
-
     private void setStateChangeListener(CallbackContext callbackContext) {
         stateChangeCallbackContext = callbackContext;
     }
@@ -186,9 +191,11 @@ public class NfcPlugin extends CordovaPlugin {
         try {
             JSONObject ndefTag = new JSONObject();
             JSONArray ndefRecords = new JSONArray();
-            ndefTag.put("tagSerial", getTagSerialNumber(tag));
+            ndefTag.put("serial", byteArrayToJSONArray(tag.getId()));
+            ndefTag.put("capacity", ndefSession.getMaxSize());
+            ndefTag.put("isWritable", ndefSession.isWritable());
             ndefTag.put("ndefRecords", ndefRecords);
-
+  
             // Read existing NDEF records
             NdefMessage ndefMessage = ndefSession.getNdefMessage();
             if (ndefMessage != null) {
@@ -196,9 +203,9 @@ public class NfcPlugin extends CordovaPlugin {
                     JSONObject ndefRecord = new JSONObject();
                         
                     ndefRecord.put("tnf", record.getTnf());
-                    ndefRecord.put("mimeType", new String(record.getType(), StandardCharsets.UTF_8));
+                    ndefRecord.put("type", byteArrayToJSONArray(record.getType()));
                     ndefRecord.put("id", byteArrayToJSONArray(record.getId()));
-                    ndefRecord.put("ndefData", byteArrayToJSONArray(record.getPayload()));
+                    ndefRecord.put("payload", byteArrayToJSONArray(record.getPayload()));
 
                     ndefRecords.put(ndefRecord);
                 }
@@ -424,14 +431,5 @@ public class NfcPlugin extends CordovaPlugin {
             byteArray[i] = (byte) jsonArray.getInt(i);
         }
         return byteArray;
-    }
-
-    private String getTagSerialNumber(Tag tag) {
-        byte[] id = tag.getId();
-        StringBuilder sb = new StringBuilder();
-        for (byte b : id) {
-            sb.append(String.format("%02X:", b));
-        }
-        return sb.substring(0, sb.length() - 1);
     }
 }
