@@ -56,10 +56,12 @@ cordova.plugins.NFC.beginScanSession(
     }
     
     console.log("TAG SERIAL: " + arrayBufferToHex(tag.serial));
+    console.log("TAG CAPACITY: " + tag.capacity.toString());
+    console.log("TAG IS WRITABLE: " + tag.isWritable.toString());
 
     for(const record of tag.ndefRecords) {
       console.log("TNF: " + record.tnf.toString());
-      console.log("DATA SIZE: " + record.ndefData.length.toString());
+      console.log("DATA SIZE: " + record.payload.length.toString());
       //record.id
       //record.type
     }
@@ -85,10 +87,12 @@ cordova.plugins.NFC.beginScanSession(
     }
     
     console.log("TAG SERIAL: " + arrayBufferToHex(tag.serial));
+    console.log("TAG CAPACITY: " + tag.capacity.toString());
+    console.log("TAG IS WRITABLE: " + tag.isWritable.toString());
 
     for(const record of tag.ndefRecords) {
       console.log("TNF: " + record.tnf.toString());
-      console.log("DATA SIZE: " + record.ndefData.length.toString());
+      console.log("DATA SIZE: " + record.payload.length.toString());
       //record.id
       //record.type
     }
@@ -104,9 +108,9 @@ cordova.plugins.NFC.beginScanSession(
           id: cordova.plugins.NFC.unset(),
           tnf: cordova.plugins.NFC.TNF_MEDIA,
           type: encoder.encode("text/plain").buffer,
-          ndefData: encoder.encode(text).buffer
-        }, 
-      ]
+          payload: encoder.encode(text).buffer
+        }
+      ],
       () => {
         // Called on write success
         console.log("Write successful.");
@@ -133,7 +137,7 @@ cordova.plugins.NFC.write(
       id: cordova.plugins.NFC.unset(),
       tnf: cordova.plugins.NFC.TNF_MEDIA,
       type: encoder.encode("text/plain").buffer,
-      ndefData: encoder.encode(text).buffer
+      payload: encoder.encode(text).buffer
     }
   ], 
   () => {

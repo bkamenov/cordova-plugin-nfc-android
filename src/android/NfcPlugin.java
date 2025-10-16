@@ -81,6 +81,11 @@ public class NfcPlugin extends CordovaPlugin {
             return true;
         }
 
+        if(action.equals("endSession")) {
+            endSession(callbackContext);
+            return true;
+        }
+
         if (action.equals("setStateChangeListener")) {
             setStateChangeListener(callbackContext);
             return true;
@@ -136,6 +141,11 @@ public class NfcPlugin extends CordovaPlugin {
         ndefSession = null;
     }
 
+    private void endSession(CallbackContext callbackContext) {
+        closeSession();
+        callbackContext.success();
+    }
+
     private void write(JSONArray args, CallbackContext callbackContext) {
         boolean reusingSession = false;
         isWriteMode = true;
@@ -173,11 +183,6 @@ public class NfcPlugin extends CordovaPlugin {
         }
     }
 
-    private void endSession(CallbackContext callbackContext) {
-        closeSession();
-        callbackContext.success();
-    }
-
     private void setStateChangeListener(CallbackContext callbackContext) {
         stateChangeCallbackContext = callbackContext;
     }
@@ -187,8 +192,10 @@ public class NfcPlugin extends CordovaPlugin {
             JSONObject ndefTag = new JSONObject();
             JSONArray ndefRecords = new JSONArray();
             ndefTag.put("serial", byteArrayToJSONArray(tag.getId()));
+            ndefTag.put("capacity", ndefSession.getMaxSize());
+            ndefTag.put("isWritable", ndefSession.isWritable());
             ndefTag.put("ndefRecords", ndefRecords);
-
+  
             // Read existing NDEF records
             NdefMessage ndefMessage = ndefSession.getNdefMessage();
             if (ndefMessage != null) {

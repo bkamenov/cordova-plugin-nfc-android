@@ -98,6 +98,8 @@ const NFC = {
    *  }
    *
    *  console.log("TAG SERIAL: " + arrayBufferToHex(tag.serial));
+   *  console.log("TAG CAPACITY: " + tag.capacity.toString());
+   *  console.log("TAG IS WRITABLE: " + tag.isWritable.toString());
    *
    *  for(const record of tag.ndefRecords) {
    *    console.log("TNF: " + record.tnf.toString());
@@ -125,6 +127,8 @@ const NFC = {
    *  }
    * 
    *  console.log("TAG SERIAL: " + arrayBufferToHex(tag.serial));
+   *  console.log("TAG CAPACITY: " + tag.capacity.toString());
+   *  console.log("TAG IS WRITABLE: " + tag.isWritable.toString());
    * 
    *  for(const record of tag.ndefRecords) {
    *    console.log("TNF: " + record.tnf.toString());
@@ -145,8 +149,8 @@ const NFC = {
    *      tnf: cordova.plugins.NFC.TNF_MEDIA,
    *      type: encoder.encode("text/plain").buffer,
    *      payload: encoder.encode(text).buffer
-   *    }, 
-   *  ]
+   *    } 
+   *  ],
    *  () => {
    *    // Called on write success
    *    console.log("Write successful.");
@@ -161,10 +165,12 @@ const NFC = {
    *   console.log("Error reading tag: " + error);
    * });
    */
-  beginScanSession: function (success, error, alertMessage) {
+  beginScanSession: function (success, error) {
     exec((tag) => {
       const transformedTag = {
         serial: intArrayToArrayBuffer(tag.serial),
+        isWritable: tag.isWritable,
+        capacity: tag.capacity,
         ndefRecords: []
       };
       for (const ndef of tag.ndefRecords) {
@@ -241,7 +247,7 @@ require('cordova/channel').onCordovaReady.subscribe(() => {
 document.addEventListener("deviceready", () => {
   setTimeout(() => {
     exec(null, null, 'NfcPlugin', 'startNfcMonitoring', []);
-  }, 0);
+  }, 2000);
 }, false);
 
 module.exports = NFC;
